@@ -7,7 +7,7 @@
 LiquidCrystal lcd(31, 30, 34, 35, 33, 32);
 
 //TODO: switch softserial to hardware serial (Serial2(TX2;RX2), Serial3(TX3;RX3), etc)
-SoftwareSerial mySerial(50, 51);
+SoftwareSerial mySerial(65, 64);
 
 const int SwitchMode = A15;
 
@@ -51,6 +51,7 @@ const int SwitchMode = A15;
 //              RANGES
 #define ELEVATE_TOP_MM            (170)
 #define ELEVATE_TOP_IMPS          (ELEVATE_TOP_MM * ELEVATE_IMPS_PER_MM)
+#define EXT_MAX_RANGE_IMPS        (999999)
 
 
 #define MICROS_IN_MILLIS          (pow(10, 3))
@@ -71,6 +72,33 @@ const int SwitchMode = A15;
 #define DEFAULT_BAUD              (9600)
 
 
+//              RADIO CMD
+#define RD_MAN_EXT_START          (25)
+#define RD_MAN_EXT_STOP           (26)
+#define RD_MAN_RET_START          (27)
+#define RD_MAN_RET_STOP           (28)
+#define RD_MAN_TURN_CW_START      (7)
+#define RD_MAN_TURN_CW_STOP       (8)
+#define RD_MAN_TURN_ACW_START     (5)
+#define RD_MAN_TURN_ACW_STOP      (6)
+#define RD_MAN_ELEVATE_START      (9)
+#define RD_MAN_ELEVATE_STOP       (10)
+#define RD_MAN_DESCEND_START      (11)
+#define RD_MAN_DESCEND_STOP       (12)
+#define RD_MAN_GRAB_OPEN_START    (17)
+#define RD_MAN_GRAB_OPEN_STOP     (18)
+#define RD_MAN_GRAB_CLOSE_START   (19)
+#define RD_MAN_GRAB_CLOSE_STOP    (20)
+#define RD_LW_FORWARD_START       (0)
+#define RD_LW_FORWARD_STOP        (0)
+#define RD_LW_BACKWARD_START      (0)
+#define RD_LW_BACKWARD_STOP       (0)
+#define RD_RW_FORWARD_START       (0)
+#define RD_RW_FORWARD_STOP        (0)
+#define RD_RW_BACKWARD_START      (0)
+#define RD_RW_BACKWARD_STOP       (0)
+
+
 Encoder extEnc(EXTEND_ENCODER_A, EXTEND_ENCODER_B);
 Encoder elevatorEnc(ELEVATOR_ENCODER_B, ELEVATOR_ENCODER_A);
 Encoder turnManEnc(TURN_MAN_ENCODER_A, TURN_MAN_ENCODER_B);
@@ -83,7 +111,7 @@ bool manGrabStatus = OPENED;
 
 //TODO: cleanup
 #define st1 2
-#define st2 5
+#define st2 54
 #define st3 8
 #define st4 11
 #define dir1 3
@@ -128,10 +156,10 @@ int speeds[4] = {50, 50, 50, 50};
 
 void setup2()
 {
-  Serial1.begin(DEFAULT_BAUD);
-  Serial1.setTimeout(150);
+  //Serial1.begin(DEFAULT_BAUD);
+  //Serial1.setTimeout(150);
   mySerial.begin(DEFAULT_BAUD);
-  pinMode(SwitchMode, INPUT_PULLUP);
+  //pinMode(SwitchMode, INPUT_PULLUP);
 }
 
 void setup()
@@ -145,7 +173,7 @@ void setup()
   {
     pinMode(i, OUTPUT);
   }
-  for (int i = A0; i <= A15; i++)
+  for (int i = A0; i <= A10; i++)
   {
     pinMode(i, OUTPUT);
   }
@@ -161,7 +189,7 @@ void setup()
   pinMode(TURN_MAN_ENCODER_B, INPUT_PULLUP);
   pinMode(TURN_MAN_LIMIT_PIN, INPUT_PULLUP);
   analogWrite(TURN_MAN_SPEED_PIN, manTurnSpeed);
-  
+  setup2();
   //TODO: cleanup
   /*for (int i = 0; i < 4; i++) {
     pinMode(s[i], OUTPUT);
@@ -194,7 +222,7 @@ void loop()
   // Serial1.write(10);
   // delay(1000);
 
-  int mode = 1;//digitalRead(SwitchMode);
+  int mode = 0;//digitalRead(SwitchMode);
   if (mode == 1)
   {
     //printD(mode, "Auto", "Mode");
@@ -222,32 +250,117 @@ void printD(int m, String a, String b)
   }
 }
 
-void loop2() {
+void loop2() 
+{
   while (mySerial.available())
   {
+    //Serial.println("FUCK");
     int in = mySerial.read();
     if (in != "")
     {
       Serial.println(in);
-      if (in == 1)
+      if (in == 0)
       {
-        stepper(1);
+        
       }
-      else if (in == 3)
+      //        EXTEND
+      else if (in == RD_MAN_EXT_START)
       {
-        stepper(3);
+        startExtendMan();
       }
-      else if (in == 21)
+      else if (in == RD_MAN_EXT_STOP)
       {
-        stepper(21);
+        stopExtendMan();
       }
-      else if (in == 23)
+      //        RETRACT
+      else if (in == RD_MAN_RET_START)
       {
-        stepper(23);
+        startRetractMan();
+      }
+      else if (in == RD_MAN_RET_STOP)
+      {
+        stopRetractMan();
+      }
+      //        TURN CW
+      else if (in == RD_MAN_TURN_CW_START)
+      {
+        startTurnManCW();
+      }
+      else if (in == RD_MAN_TURN_CW_STOP)
+      {
+        stopTurnManCW();
+      }
+      //        TURN ACW
+      else if (in == RD_MAN_TURN_ACW_START)
+      {
+        startTurnManACW();
+      }
+      else if (in == RD_MAN_TURN_ACW_STOP)
+      {
+        stopTurnManACW();
+      }
+      //        ELEVATE
+      else if (in == RD_MAN_ELEVATE_START)
+      {
+        startElevateMan();
+      }
+      else if (in == RD_MAN_ELEVATE_STOP)
+      {
+        stopElevateMan();
+      }
+      //        DESCEND
+      else if (in == RD_MAN_DESCEND_START)
+      {
+        startDescendMan();
+      }
+      else if (in == RD_MAN_DESCEND_STOP)
+      {
+        stopDescendMan();
+      }
+      else if (in == RD_MAN_GRAB_OPEN_START)
+      {
+        startExtendGrabber();
+      }
+      else if (in == RD_MAN_GRAB_OPEN_STOP)
+      {
+        stopExtendGrabber();
+      }
+      else if (in == RD_MAN_GRAB_CLOSE_START)
+      {
+        startRetractGrabber();
+      }
+      else if (in == RD_MAN_GRAB_CLOSE_STOP)
+      {
+        stopRetractGrabber();
       }
       else
       {
-        Serial1.write(in);
+        
+      }
+      //check extend limiters
+      if(!digitalRead(EXTEND_LIMIT_PIN))
+      {
+        stopExtendMan();
+        extEnc.write(0);
+      }
+      if(extEnc.read() >= EXT_MAX_RANGE_IMPS)
+      {
+        stopRetractMan();
+      }
+      //check elevate limiters
+      if(!digitalRead(ELEVATOR_LIMIT_PIN))
+      {
+        stopDescendMan();
+        elevatorEnc.write(0);
+      }
+      if(elevatorEnc.read() >= ELEVATE_TOP_IMPS)
+      {
+        stopElevateMan();
+      }
+      //check grab limiters
+      if(!digitalRead(GRABBER_LIMIT_PIN))
+      {
+        stopRetractGrabber();z
       }
     }
   }
